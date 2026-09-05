@@ -3,172 +3,163 @@
 /*                                                        :::      ::::::::   */
 /*   PmergeMe.hpp                                       :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: joaolive <joaolive@student.42sp.org.br>    +#+  +:+       +#+        */
+/*   By: gyasuhir <gyasuhir@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/03/06 16:54:42 by joaolive          #+#    #+#             */
-/*   Updated: 2026/03/09 10:38:20 by joaolive         ###   ########.fr       */
+/*   Created: 2025/07/29 09:24:24 by naharumi          #+#    #+#             */
+/*   Updated: 2026/09/05 14:37:04 by gyasuhir         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#pragma once
+#ifndef PMERGE_ME_HPP
+#define PMERGE_ME_HPP
 
 #include <algorithm>
-#include <string>
+#include <ctime>
+#include <iomanip>
 #include <iostream>
-#include <cstddef>
+#include <sstream>
+#include <stdexcept>
+#include <vector>
+#include <deque>
 
-/*
-** Ford-Johnson (merge-insertion sort).
-**
-** O algoritmo trabalha sobre "blocos" de tamanho s de elementos consecutivos.
-** Invariante mantida em todos os niveis: o ULTIMO elemento de um bloco e o
-** maior valor daquele bloco. Esse elemento e a chave do bloco.
-**
-** A cada nivel os blocos sao emparelhados (1 comparacao por par) e o par e
-** arrumado de modo que o bloco de maior chave fique em segundo. Assim os dois
-** blocos de um par ficam FISICAMENTE ADJACENTES, e a recursao sobre blocos de
-** tamanho 2s reordena o par inteiro como uma unidade: o bloco menor viaja
-** colado ao seu parceiro maior. E isso que preserva a associacao par<->parceiro
-** exigida pelo Ford-Johnson e que permite limitar cada busca binaria.
-*/
 class PmergeMe {
 	private:
-		static size_t jacobsthal(size_t k);
+		std::vector<int>	_vec;
+		std::deque<int>		_deq;
 
-		template <typename Container>
-		static int blockKey(const Container& arr, size_t block, size_t s);
-		template <typename Container>
-		static void swapBlocks(Container& arr, size_t a, size_t b, size_t s);
-		template <typename Container>
-		static void sortBlocks(Container& arr, size_t s);
-
-		/* Compara dois blocos (identificados pelo indice) pela chave. */
-		template <typename Container>
-		class BlockLess {
-			private:
-				const Container*	_arr;
-				size_t				_s;
-			public:
-				BlockLess(const Container& arr, size_t s) : _arr(&arr), _s(s) {}
-				bool operator()(int lhs, int rhs) const {
-					return ((*_arr)[static_cast<size_t>(lhs) * _s + _s - 1]
-						< (*_arr)[static_cast<size_t>(rhs) * _s + _s - 1]);
-				}
-		};
 	public:
-		PmergeMe();
+		PmergeMe(void);
 		PmergeMe(const PmergeMe& other);
-		PmergeMe& operator=(const PmergeMe& other);
-		~PmergeMe();
+		~PmergeMe(void);
 
-		template <typename Container>
-		static void fordJohnsonSort(Container& arr);
-		template <typename Container>
-		static void printContainer(const Container& arr, const std::string& prefix);
+		PmergeMe&	operator=(const PmergeMe& other);
+
+		void	processInput(int ac, char **av);
+		void	sortVector(void);
+		void	sortDeque(void);
+};
+
+std::vector<size_t>	generateInsertionSeq(size_t n);
+int					jacobsthal(int num);
+
+template <typename Container>
+int	blockKey(const Container& c, size_t block, size_t size) {
+	return c[block * size + size - 1];
+}
+
+template <typename Container>
+void	swapBlocks(Container& c, size_t a, size_t b, size_t size) {
+	for (size_t i = 0; i < size; i++)
+		std::swap(c[a * size + i], c[b * size + i]);
+}
+
+template <typename Container>
+class BlockLess {
+	private:
+		const Container*	_c;
+		size_t				_size;
+
+	public:
+		BlockLess(const Container& c, size_t size) : _c(&c), _size(size) {}
+
+		bool	operator()(int lhs, int rhs) const {
+			return blockKey(*_c, static_cast<size_t>(lhs), _size)
+				 < blockKey(*_c, static_cast<size_t>(rhs), _size);
+		}
 };
 
 template <typename Container>
-void PmergeMe::printContainer(const Container& arr, const std::string& prefix) {
-	std::cout << prefix;
-	typename Container::const_iterator it = arr.begin();
-	size_t count = 0;
+Container	mergeInsertBlocks(Container input, size_t size) {
+	size_t	blocks = input.size() / size;
+	if (blocks < 2)
+		return input;
 
-	for (; it != arr.end(); ++it, ++count) {
-		std::cout << *it << " ";
-		if (count == 4 && arr.size() > 5) {
-			std::cout << "[...]";
-			break;
+	bool	hasLeftover = (blocks % 2 == 1);
+	size_t	pairs = blocks / 2;
+
+	for (size_t i = 0; i < pairs; i++) {
+		if (blockKey(input, 2 * i, size) > blockKey(input, 2 * i + 1, size))
+			swapBlocks(input, 2 * i, 2 * i + 1, size);
+	}
+
+	input = mergeInsertBlocks(input, size * 2);
+
+	BlockLess<Container>	less(input, size);
+	Container				chain;
+
+	chain.push_back(0);
+	for (size_t i = 0; i < pairs; i++)
+		chain.push_back(static_cast<int>(2 * i + 1));
+
+	size_t				pendCount = pairs + (hasLeftover ? 1 : 0);
+	std::vector<size_t>	order = generateInsertionSeq(pendCount);
+
+	for (size_t i = 0; i < order.size(); i++) {
+		size_t	k = order[i];
+		if (k == 1)
+			continue;
+
+		int								pendBlock;
+		typename Container::iterator	limit;
+
+		if (hasLeftover && k == pendCount) {
+			pendBlock = static_cast<int>(blocks - 1);
+			limit = chain.end();
+		} else {
+			pendBlock = static_cast<int>(2 * (k - 1));
+			limit = std::find(chain.begin(), chain.end(),
+				static_cast<int>(2 * k - 1));
 		}
+
+		typename Container::iterator pos =
+			std::lower_bound(chain.begin(), limit, pendBlock, less);
+		chain.insert(pos, pendBlock);
+	}
+
+	Container	output;
+	for (typename Container::const_iterator it = chain.begin(); it != chain.end(); ++it) {
+		size_t	base = static_cast<size_t>(*it) * size;
+		for (size_t i = 0; i < size; i++)
+			output.push_back(input[base + i]);
+	}
+	for (size_t i = blocks * size; i < input.size(); i++)
+		output.push_back(input[i]);
+
+	return output;
+}
+
+template <typename Container>
+Container	insertMergeSort(Container input) {
+	return mergeInsertBlocks(input, 1);
+}
+
+template <typename Container>
+bool	isSorted(const Container& c) {
+	if (c.size() < 2)
+		return true;
+
+	typename Container::const_iterator it = c.begin();
+	typename Container::const_iterator next = it;
+	++next;
+
+	while (next != c.end()) {
+		if (*it > *next)
+			return false;
+		++it;
+		++next;
+	}
+	return true;
+}
+
+template <typename Container>
+void	printContainer(const Container& c) {
+	typename Container::const_iterator	it = c.begin();
+
+	while (it != c.end()) {
+		std::cout << " " << *it ;
+		++it;
 	}
 	std::cout << std::endl;
 }
 
-template <typename Container>
-int PmergeMe::blockKey(const Container& arr, size_t block, size_t s) {
-	return (arr[block * s + s - 1]);
-}
-
-template <typename Container>
-void PmergeMe::swapBlocks(Container& arr, size_t a, size_t b, size_t s) {
-	for (size_t k = 0; k < s; ++k)
-		std::swap(arr[a * s + k], arr[b * s + k]);
-}
-
-template <typename Container>
-void PmergeMe::sortBlocks(Container& arr, size_t s) {
-	size_t n = arr.size() / s;
-	if (n < 2)
-		return ;
-
-	bool	isOdd = (n % 2 != 0);
-	size_t	pairs = n / 2;
-
-	/* 1) Uma comparacao por par: o bloco de maior chave fica em segundo. */
-	for (size_t i = 0; i < pairs; ++i) {
-		if (blockKey(arr, 2 * i, s) > blockKey(arr, 2 * i + 1, s))
-			swapBlocks(arr, 2 * i, 2 * i + 1, s);
-	}
-
-	/* 2) Ordena recursivamente os pares como blocos de tamanho 2s.
-	**    O parceiro menor viaja junto porque esta colado ao maior. */
-	sortBlocks(arr, 2 * s);
-
-	/* 3) Merge-insertion. Depois da recursao, o bloco 2k e o menor do par k
-	**    e o bloco 2k+1 e o maior; os pares estao ordenados entre si.
-	**    Cadeia principal: [ b1, a1, a2, ..., ak ]  com b1 = bloco 0. */
-	BlockLess<Container>	less(arr, s);
-	Container				main;
-
-	main.push_back(0);
-	for (size_t i = 0; i < pairs; ++i)
-		main.push_back(static_cast<int>(2 * i + 1));
-
-	/* Insere os pendentes b2..bk na ordem de Jacobsthal: b3 b2, b5 b4,
-	** b11 b10 ... b6, ... Cada bj entra por busca binaria limitada a
-	** posicao do seu parceiro aj, pois sabemos que bj < aj.
-	**
-	** O bloco impar sobrando (sem parceiro) entra na lista de pendentes como
-	** ultimo elemento e e inserido tambem na ordem de Jacobsthal, so que sem
-	** limite superior. Inseri-lo aqui em vez de no fim de tudo e o que fecha
-	** a contagem otima de comparacoes. */
-	size_t pendCount = pairs + (isOdd ? 1 : 0);
-	size_t prev = 1;
-	for (size_t k = 3; prev < pendCount; ++k) {
-		size_t curr = jacobsthal(k);
-		if (curr > pendCount)
-			curr = pendCount;
-		for (size_t j = curr; j > prev; --j) {
-			int								pendBlock;
-			typename Container::iterator	limit;
-
-			if (isOdd && j == pendCount) {
-				pendBlock = static_cast<int>(n - 1);
-				limit = main.end();
-			} else {
-				pendBlock = static_cast<int>(2 * (j - 1));
-				limit = std::find(main.begin(), main.end(),
-					static_cast<int>(2 * j - 1));
-			}
-			typename Container::iterator pos =
-				std::lower_bound(main.begin(), limit, pendBlock, less);
-			main.insert(pos, pendBlock);
-		}
-		prev = curr;
-	}
-
-	/* 4) Reescreve os n*s primeiros elementos na ordem dos blocos da cadeia.
-	**    O resto (menos de s elementos) pertence ao nivel de cima e fica. */
-	Container	sorted;
-	for (typename Container::const_iterator it = main.begin(); it != main.end(); ++it) {
-		size_t base = static_cast<size_t>(*it) * s;
-		for (size_t k = 0; k < s; ++k)
-			sorted.push_back(arr[base + k]);
-	}
-	for (size_t i = 0; i < sorted.size(); ++i)
-		arr[i] = sorted[i];
-}
-
-template <typename Container>
-void PmergeMe::fordJohnsonSort(Container& arr) {
-	sortBlocks(arr, 1);
-}
+#endif
