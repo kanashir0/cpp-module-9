@@ -25,20 +25,22 @@ PmergeMe& PmergeMe::operator=(const PmergeMe& other) {
 
 PmergeMe::~PmergeMe() {}
 
-void PmergeMe::genJacobsthal(std::vector<int>& seq, int n) {
-	if (n <= 0)
-		return ;
-	seq.push_back(0);
-	if (n == 1)
-		return ;
-	seq.push_back(1);
-	int i = 2;
-	for (;;) {
-		int nextVal = seq[i - 1] + 2 * seq[i - 2];
-		seq.push_back(nextVal);
-		if (nextVal > n)
-			break ;
-		i++;
-	}
-}
+/*
+** k-esimo numero de Jacobsthal: J(0)=0, J(1)=1, J(k)=J(k-1)+2*J(k-2).
+** Sequencia: 0, 1, 1, 3, 5, 11, 21, 43, 85, 171, ...
+**
+** Esses numeros dao a ordem otima de insercao dos pendentes: eles caem
+** alternadamente logo acima e logo abaixo de potencias de 2, o que faz cada
+** busca binaria aproveitar ao maximo as comparacoes que gasta.
+*/
+size_t PmergeMe::jacobsthal(size_t k) {
+	size_t prev = 0;
+	size_t curr = 1;
 
+	for (size_t i = 1; i < k; ++i) {
+		size_t next = curr + 2 * prev;
+		prev = curr;
+		curr = next;
+	}
+	return (curr);
+}

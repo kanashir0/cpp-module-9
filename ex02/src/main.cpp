@@ -14,6 +14,9 @@
 #include <sys/time.h>
 #include <stdexcept>
 #include <deque>
+#include <vector>
+#include <cctype>
+#include <cstdlib>
 
 double getElapsedTime(struct timeval start, struct timeval end) {
 	return (end.tv_sec - start.tv_sec) * 1000000.0 + (end.tv_usec - start.tv_usec);
@@ -27,7 +30,7 @@ std::vector<int> parseArguments(int argc, char** argv) {
 			throw std::invalid_argument("Error: empty argument.");
 
 		for (size_t j = 0; j < arg.length(); ++j) {
-			if (!isdigit(arg[j]) && !(j == 0 && arg[j] == '+')) {
+			if (!std::isdigit(static_cast<unsigned char>(arg[j])) && !(j == 0 && arg[j] == '+')) {
 				throw std::invalid_argument("Error: invalid characters found.");
 			}
 		}
